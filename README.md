@@ -25,27 +25,6 @@ A React Native app that helps users find their correct shoe size based on their 
    const supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
    ```
 
-5. Create the following table in your Supabase database:
-   ```sql
-   create table shoes (
-     id uuid default uuid_generate_v4() primary key,
-     user_id uuid references auth.users,
-     brand text not null,
-     model text not null,
-     size text not null,
-     fit text not null check (fit in ('too small', 'perfect', 'too large')),
-     created_at timestamp with time zone default timezone('utc'::text, now())
-   );
-
-   -- Add RLS policies
-   create policy "Users can read their own shoes"
-     on shoes for select
-     using (auth.uid() = user_id);
-
-   create policy "Users can insert their own shoes"
-     on shoes for insert
-     with check (auth.uid() = user_id);
-   ```
 
 6. Run the app:
    ```bash
