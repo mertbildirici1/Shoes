@@ -89,6 +89,7 @@ export const ProfileScreen = () => {
               <Text style={styles.shoeBrand}>{item.brand}</Text>
               <Text style={styles.shoeModel}>{item.model}</Text>
               <Text style={styles.shoeDetails}>Size: {item.size}</Text>
+              <Text style={styles.shoeDetails}>Size Type: {item.size_type}</Text>
               <Text style={styles.shoeDetails}>Fit: {item.fit}</Text>
             </View>
             <TouchableOpacity

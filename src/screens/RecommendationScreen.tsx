@@ -18,6 +18,7 @@ interface Shoe {
   brand: string;
   model: string;
   size: string;
+  sizeType: 'EU' | 'US';
   fit: 'too small' | 'perfect' | 'too large';
 }
 
@@ -33,6 +34,12 @@ export const RecommendationScreen = () => {
   const [shoeToAdd, setShoeToAdd] = useState<ShoeCatalog | null>(null);
   const { user } = useAuth();
   const navigation = useNavigation();
+  const [sizeType, setSizeType] = useState<'EU' | 'US'>('EU');
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+
+  // Add size options
+  const euSizes = ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46', '47'];
+  const usSizes = ['4', '4.5', '5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12'];
 
   useEffect(() => {
     fetchShoeCatalog();
@@ -127,8 +134,8 @@ export const RecommendationScreen = () => {
   };
 
   const handleConfirmAdd = async () => {
-    if (!user || !shoeToAdd || !size) {
-      Alert.alert('Error', 'Please enter a size');
+    if (!user || !shoeToAdd || !selectedSize) {
+      Alert.alert('Error', 'Please select a size');
       return;
     }
 
@@ -140,7 +147,8 @@ export const RecommendationScreen = () => {
             user_id: user.id,
             brand: shoeToAdd.brand,
             model: shoeToAdd.model,
-            size,
+            size: selectedSize,
+            size_type: sizeType,
             fit,
           },
         ]);
@@ -149,7 +157,7 @@ export const RecommendationScreen = () => {
 
       Alert.alert('Success', 'Shoe added to your collection!');
       setShowAddModal(false);
-      setSize('');
+      setSelectedSize(null);
       setFit('perfect');
       setShoeToAdd(null);
       fetchUserShoes();
@@ -178,27 +186,25 @@ export const RecommendationScreen = () => {
         data={filteredShoes}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={styles.shoeItemContainer}>
-            <TouchableOpacity
-              style={[
-                styles.shoeItem,
-                selectedShoe?.id === item.id && styles.selectedShoe
-              ]}
-              onPress={() => setSelectedShoe(item)}
-            >
-              <View style={styles.shoeInfo}>
-                <Text style={styles.shoeBrand}>{item.brand}</Text>
-                <Text style={styles.shoeModel}>{item.model}</Text>
-                <Text style={styles.shoeCategory}>{item.category}</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => handleAddToCollection(item)}
-            >
-              <Text style={styles.addButtonText}>I have this</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={[
+              styles.shoeItem,
+              selectedShoe?.id === item.id && styles.selectedShoe
+            ]}
+            onPress={() => setSelectedShoe(item)}
+          >
+            <View style={styles.shoeInfo}>
+              <Text style={styles.shoeBrand}>{item.brand}</Text>
+              <Text style={styles.shoeModel}>{item.model}</Text>
+              <Text style={styles.shoeCategory}>{item.category}</Text>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => handleAddToCollection(item)}
+              >
+                <Text style={styles.addButtonText}>I have this</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
         )}
       />
 
@@ -259,13 +265,40 @@ export const RecommendationScreen = () => {
               </View>
             )}
 
-            <TextInput
-              style={styles.input}
-              placeholder="Size"
-              value={size}
-              onChangeText={setSize}
-              keyboardType="numeric"
-            />
+            <View style={styles.sizeTypeContainer}>
+              <TouchableOpacity
+                style={[styles.sizeTypeButton, sizeType === 'EU' && styles.selectedSizeType]}
+                onPress={() => setSizeType('EU')}
+              >
+                <Text style={styles.sizeTypeText}>EU</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sizeTypeButton, sizeType === 'US' && styles.selectedSizeType]}
+                onPress={() => setSizeType('US')}
+              >
+                <Text style={styles.sizeTypeText}>US</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.sizeGrid}>
+              {(sizeType === 'EU' ? euSizes : usSizes).map((size) => (
+                <TouchableOpacity
+                  key={size}
+                  style={[
+                    styles.sizeSquare,
+                    selectedSize === size && styles.selectedSizeSquare
+                  ]}
+                  onPress={() => setSelectedSize(size)}
+                >
+                  <Text style={[
+                    styles.sizeSquareText,
+                    selectedSize === size && styles.selectedSizeSquareText
+                  ]}>
+                    {size}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <View style={styles.fitContainer}>
               <TouchableOpacity
@@ -318,18 +351,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
   },
-  shoeItemContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
   shoeItem: {
-    flex: 1,
     backgroundColor: 'white',
     padding: 15,
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#ddd',
+    marginBottom: 10,
   },
   shoeInfo: {
     flex: 1,
@@ -410,10 +438,9 @@ const styles = StyleSheet.create({
   },
   addButton: {
     backgroundColor: '#34C759',
-    padding: 10,
+    padding: 8,
     borderRadius: 5,
-    marginLeft: 10,
-    minWidth: 100,
+    marginTop: 10,
     alignItems: 'center',
   },
   addButtonText: {
@@ -457,13 +484,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  input: {
-    backgroundColor: '#f5f5f5',
-    padding: 15,
-    borderRadius: 5,
+  sizeTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     marginBottom: 20,
+  },
+  sizeTypeButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginHorizontal: 5,
+    borderRadius: 5,
+    backgroundColor: '#e0e0e0',
+  },
+  selectedSizeType: {
+    backgroundColor: '#007AFF',
+  },
+  sizeTypeText: {
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  sizeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  sizeSquare: {
+    width: 45,
+    height: 45,
+    margin: 5,
+    borderRadius: 5,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ddd',
+  },
+  selectedSizeSquare: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  sizeSquareText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  selectedSizeSquareText: {
+    color: 'white',
   },
   fitContainer: {
     flexDirection: 'row',

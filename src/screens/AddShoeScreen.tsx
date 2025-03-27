@@ -14,12 +14,17 @@ interface ShoeCatalog {
 
 export const AddShoeScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [size, setSize] = useState('');
+  const [sizeType, setSizeType] = useState<'EU' | 'US'>('EU');
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [fit, setFit] = useState<'too small' | 'perfect' | 'too large'>('perfect');
   const [shoeCatalog, setShoeCatalog] = useState<ShoeCatalog[]>([]);
   const [selectedShoe, setSelectedShoe] = useState<ShoeCatalog | null>(null);
   const { user } = useAuth();
   const navigation = useNavigation();
+
+  // Add size options
+  const euSizes = ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46', '47'];
+  const usSizes = ['4', '4.5', '5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12'];
 
   useEffect(() => {
     fetchShoeCatalog();
@@ -45,8 +50,8 @@ export const AddShoeScreen = () => {
       return;
     }
 
-    if (!size) {
-      Alert.alert('Error', 'Please enter a size');
+    if (!selectedSize) {
+      Alert.alert('Error', 'Please select a size');
       return;
     }
 
@@ -58,7 +63,8 @@ export const AddShoeScreen = () => {
             user_id: user.id,
             brand: selectedShoe.brand,
             model: selectedShoe.model,
-            size,
+            size: selectedSize,
+            size_type: sizeType,
             fit,
           },
         ]);
@@ -108,13 +114,41 @@ export const AddShoeScreen = () => {
 
       {selectedShoe && (
         <View style={styles.formContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Size"
-            value={size}
-            onChangeText={setSize}
-            keyboardType="numeric"
-          />
+          <View style={styles.sizeTypeContainer}>
+            <TouchableOpacity
+              style={[styles.sizeTypeButton, sizeType === 'EU' && styles.selectedSizeType]}
+              onPress={() => setSizeType('EU')}
+            >
+              <Text style={styles.sizeTypeText}>EU</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sizeTypeButton, sizeType === 'US' && styles.selectedSizeType]}
+              onPress={() => setSizeType('US')}
+            >
+              <Text style={styles.sizeTypeText}>US</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.sizeGrid}>
+            {(sizeType === 'EU' ? euSizes : usSizes).map((size) => (
+              <TouchableOpacity
+                key={size}
+                style={[
+                  styles.sizeSquare,
+                  selectedSize === size && styles.selectedSizeSquare
+                ]}
+                onPress={() => setSelectedSize(size)}
+              >
+                <Text style={[
+                  styles.sizeSquareText,
+                  selectedSize === size && styles.selectedSizeSquareText
+                ]}>
+                  {size}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <View style={styles.fitContainer}>
             <TouchableOpacity
               style={[styles.fitButton, fit === 'too small' && styles.selectedFit]}
@@ -135,6 +169,7 @@ export const AddShoeScreen = () => {
               <Text style={styles.fitButtonText}>Too Large</Text>
             </TouchableOpacity>
           </View>
+
           <TouchableOpacity style={styles.addButton} onPress={handleAddShoe}>
             <Text style={styles.buttonText}>Add to Collection</Text>
           </TouchableOpacity>
@@ -194,13 +229,52 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 5,
   },
-  input: {
-    backgroundColor: '#f5f5f5',
-    padding: 15,
-    borderRadius: 5,
+  sizeTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     marginBottom: 20,
+  },
+  sizeTypeButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginHorizontal: 5,
+    borderRadius: 5,
+    backgroundColor: '#e0e0e0',
+  },
+  selectedSizeType: {
+    backgroundColor: '#007AFF',
+  },
+  sizeTypeText: {
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  sizeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  sizeSquare: {
+    width: 45,
+    height: 45,
+    margin: 5,
+    borderRadius: 5,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ddd',
+  },
+  selectedSizeSquare: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  sizeSquareText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  selectedSizeSquareText: {
+    color: 'white',
   },
   fitContainer: {
     flexDirection: 'row',
