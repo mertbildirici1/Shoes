@@ -1,57 +1,108 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, TouchableOpacity, Text, StyleSheet, Alert, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Shoe, SizeRecommendation } from '../types';
-import { useNavigation } from '@react-navigation/native';
+import { PostgrestError } from '@supabase/supabase-js';
+import { Ionicons } from '@expo/vector-icons';
+
+interface ShoeCatalog {
+  id: string;
+  brand: string;
+  model: string;
+  category: string;
+}
+
+interface Shoe {
+  id: string;
+  brand: string;
+  model: string;
+  size: string;
+  fit: 'too small' | 'perfect' | 'too large';
+}
 
 export const RecommendationScreen = () => {
-  const [brand, setBrand] = useState('');
-  const [model, setModel] = useState('');
-  const [recommendation, setRecommendation] = useState<SizeRecommendation | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [shoeCatalog, setShoeCatalog] = useState<ShoeCatalog[]>([]);
+  const [selectedShoe, setSelectedShoe] = useState<ShoeCatalog | null>(null);
   const [userShoes, setUserShoes] = useState<Shoe[]>([]);
+  const [recommendation, setRecommendation] = useState<{ size: string; confidence: number } | null>(null);
   const { user } = useAuth();
   const navigation = useNavigation();
 
   useEffect(() => {
-    fetchUserShoes();
-  }, []);
+    fetchShoeCatalog();
+    if (user) {
+      fetchUserShoes();
+    }
+  }, [user]);
+
+  const fetchShoeCatalog = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('shoe_catalog')
+        .select('*')
+        .order('brand');
+
+      if (error) throw error;
+      setShoeCatalog(data || []);
+    } catch (error) {
+      Alert.alert('Error', (error as PostgrestError).message);
+    }
+  };
 
   const fetchUserShoes = async () => {
     if (!user) return;
 
     try {
       const { data, error } = await supabase
-        .from('shoes')
-        .select('*')
+        .from('user_shoes')
+        .select(`
+          shoe_id,
+          shoes (
+            id,
+            brand,
+            model,
+            size,
+            fit
+          )
+        `)
         .eq('user_id', user.id);
 
       if (error) throw error;
-      setUserShoes(data || []);
+      
+      const transformedData = data.map(item => ({
+        id: item.shoes.id,
+        brand: item.shoes.brand,
+        model: item.shoes.model,
+        size: item.shoes.size,
+        fit: item.shoes.fit,
+      }));
+      
+      setUserShoes(transformedData);
     } catch (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert('Error', (error as PostgrestError).message);
     }
   };
 
   const getRecommendation = () => {
-    if (!brand || !model) {
-      Alert.alert('Error', 'Please enter both brand and model');
+    if (!selectedShoe) {
+      Alert.alert('Error', 'Please select a shoe first');
       return;
     }
 
     // Find exact matches
     const exactMatches = userShoes.filter(
-      shoe => shoe.brand.toLowerCase() === brand.toLowerCase() &&
-      shoe.model.toLowerCase() === model.toLowerCase()
+      shoe => shoe.brand.toLowerCase() === selectedShoe.brand.toLowerCase() &&
+      shoe.model.toLowerCase() === selectedShoe.model.toLowerCase()
     );
 
     if (exactMatches.length > 0) {
       const perfectFit = exactMatches.find(shoe => shoe.fit === 'perfect');
       if (perfectFit) {
         setRecommendation({
-          recommendedSize: perfectFit.size,
+          size: perfectFit.size,
           confidence: 0.9,
-          basedOn: [perfectFit],
         });
         return;
       }
@@ -59,7 +110,7 @@ export const RecommendationScreen = () => {
 
     // Find brand matches
     const brandMatches = userShoes.filter(
-      shoe => shoe.brand.toLowerCase() === brand.toLowerCase()
+      shoe => shoe.brand.toLowerCase() === selectedShoe.brand.toLowerCase()
     );
 
     if (brandMatches.length > 0) {
@@ -67,79 +118,84 @@ export const RecommendationScreen = () => {
       if (perfectFits.length > 0) {
         const avgSize = perfectFits.reduce((acc, shoe) => acc + parseFloat(shoe.size), 0) / perfectFits.length;
         setRecommendation({
-          recommendedSize: avgSize.toFixed(1),
+          size: avgSize.toFixed(1),
           confidence: 0.7,
-          basedOn: perfectFits,
         });
         return;
       }
     }
 
     setRecommendation({
-      recommendedSize: 'Unknown',
+      size: 'Unknown',
       confidence: 0,
-      basedOn: [],
     });
   };
 
+  const filteredShoes = shoeCatalog.filter(shoe => 
+    shoe.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    shoe.model.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Get Size Recommendation</Text>
-        <TouchableOpacity 
-          style={styles.profileButton}
-          onPress={() => navigation.navigate('Profile')}
-        >
-          <Text style={styles.profileButtonText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
-
+      <Text style={styles.title}>Get Size Recommendation</Text>
+      
       <TextInput
-        style={styles.input}
-        placeholder="Brand"
-        value={brand}
-        onChangeText={setBrand}
+        style={styles.searchInput}
+        placeholder="Search shoes..."
+        value={searchQuery}
+        onChangeText={setSearchQuery}
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Model"
-        value={model}
-        onChangeText={setModel}
-      />
-      <TouchableOpacity style={styles.button} onPress={getRecommendation}>
-        <Text style={styles.buttonText}>Get Recommendation</Text>
-      </TouchableOpacity>
 
-      {recommendation && (
-        <View style={styles.recommendationContainer}>
-          <Text style={styles.recommendationTitle}>Recommended Size</Text>
-          <Text style={styles.recommendationSize}>{recommendation.recommendedSize}</Text>
-          <Text style={styles.confidenceText}>
-            Confidence: {Math.round(recommendation.confidence * 100)}%
-          </Text>
-        </View>
-      )}
-
-      <TouchableOpacity 
-        style={[styles.button, styles.addButton]} 
-        onPress={() => navigation.navigate('AddShoe')}
-      >
-        <Text style={styles.buttonText}>Add New Shoe</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.sectionTitle}>Your Shoe Collection</Text>
       <FlatList
-        data={userShoes}
+        data={filteredShoes}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={styles.shoeItem}>
+          <TouchableOpacity
+            style={[
+              styles.shoeItem,
+              selectedShoe?.id === item.id && styles.selectedShoe
+            ]}
+            onPress={() => setSelectedShoe(item)}
+          >
             <Text style={styles.shoeBrand}>{item.brand}</Text>
             <Text style={styles.shoeModel}>{item.model}</Text>
-            <Text style={styles.shoeSize}>Size: {item.size}</Text>
-            <Text style={styles.shoeFit}>Fit: {item.fit}</Text>
-          </View>
+            <Text style={styles.shoeCategory}>{item.category}</Text>
+          </TouchableOpacity>
         )}
       />
+
+      {selectedShoe && (
+        <View style={styles.recommendationContainer}>
+          <View style={styles.recommendationHeader}>
+            <Text style={styles.selectedShoeTitle}>Selected Shoe:</Text>
+            <TouchableOpacity 
+              onPress={() => {
+                setSelectedShoe(null);
+                setRecommendation(null);
+              }}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close-circle" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.selectedShoeText}>{selectedShoe.brand} {selectedShoe.model}</Text>
+          
+          <TouchableOpacity style={styles.button} onPress={getRecommendation}>
+            <Text style={styles.buttonText}>Get Size Recommendation</Text>
+          </TouchableOpacity>
+
+          {recommendation && (
+            <View style={styles.resultContainer}>
+              <Text style={styles.resultTitle}>Recommended Size</Text>
+              <Text style={styles.resultSize}>{recommendation.size}</Text>
+              <Text style={styles.confidenceText}>
+                Confidence: {Math.round(recommendation.confidence * 100)}%
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
     </View>
   );
 };
@@ -150,78 +206,30 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#f5f5f5',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
   },
-  profileButton: {
-    backgroundColor: '#007AFF',
-    padding: 10,
-    borderRadius: 5,
-  },
-  profileButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  input: {
+  searchInput: {
     backgroundColor: 'white',
     padding: 15,
     borderRadius: 5,
-    marginBottom: 10,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#ddd',
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 20,
-  },
-  addButton: {
-    backgroundColor: '#34C759',
-  },
-  buttonText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  recommendationContainer: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 5,
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  recommendationTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  recommendationSize: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  confidenceText: {
-    marginTop: 10,
-    color: '#666',
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
   },
   shoeItem: {
     backgroundColor: 'white',
     padding: 15,
     borderRadius: 5,
     marginBottom: 10,
+  },
+  selectedShoe: {
+    backgroundColor: '#e3f2fd',
+    borderColor: '#007AFF',
+    borderWidth: 1,
   },
   shoeBrand: {
     fontSize: 16,
@@ -231,11 +239,65 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  shoeSize: {
+  shoeCategory: {
+    fontSize: 12,
+    color: '#999',
     marginTop: 5,
   },
-  shoeFit: {
-    marginTop: 5,
+  recommendationContainer: {
+    marginTop: 20,
+    padding: 20,
+    backgroundColor: 'white',
+    borderRadius: 5,
+  },
+  recommendationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  selectedShoeTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  selectedShoeText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 5,
+    marginBottom: 20,
+  },
+  buttonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  resultContainer: {
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 5,
+  },
+  resultTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  resultSize: {
+    fontSize: 36,
+    fontWeight: 'bold',
     color: '#007AFF',
+  },
+  confidenceText: {
+    marginTop: 10,
+    color: '#666',
+  },
+  closeButton: {
+    padding: 5,
   },
 }); 
