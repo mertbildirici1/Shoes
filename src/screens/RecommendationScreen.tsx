@@ -22,12 +22,25 @@ interface Shoe {
   fit: 'too small' | 'perfect' | 'too large';
 }
 
+// Add size conversion functions
+const euToUs = (euSize: number): number => {
+  return euSize - 31;
+};
+
+const usToEu = (usSize: number): number => {
+  return usSize + 31;
+};
+
 export const RecommendationScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [shoeCatalog, setShoeCatalog] = useState<ShoeCatalog[]>([]);
   const [selectedShoe, setSelectedShoe] = useState<ShoeCatalog | null>(null);
   const [userShoes, setUserShoes] = useState<Shoe[]>([]);
-  const [recommendation, setRecommendation] = useState<{ size: string; confidence: number } | null>(null);
+  const [recommendation, setRecommendation] = useState<{
+    euSize: string;
+    usSize: string;
+    confidence: number;
+  } | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [size, setSize] = useState('');
   const [fit, setFit] = useState<'too small' | 'perfect' | 'too large'>('perfect');
@@ -93,8 +106,13 @@ export const RecommendationScreen = () => {
     if (exactMatches.length > 0) {
       const perfectFit = exactMatches.find(shoe => shoe.fit === 'perfect');
       if (perfectFit) {
+        const size = parseFloat(perfectFit.size);
+        const euSize = perfectFit.sizeType === 'EU' ? size : usToEu(size);
+        const usSize = perfectFit.sizeType === 'US' ? size : euToUs(size);
+        
         setRecommendation({
-          size: perfectFit.size,
+          euSize: euSize.toFixed(1),
+          usSize: usSize.toFixed(1),
           confidence: 0.9,
         });
         return;
@@ -109,9 +127,14 @@ export const RecommendationScreen = () => {
     if (brandMatches.length > 0) {
       const perfectFits = brandMatches.filter(shoe => shoe.fit === 'perfect');
       if (perfectFits.length > 0) {
-        const avgSize = perfectFits.reduce((acc, shoe) => acc + parseFloat(shoe.size), 0) / perfectFits.length;
+        const avgSize = perfectFits.reduce((acc, shoe) => {
+          const size = parseFloat(shoe.size);
+          return acc + (shoe.sizeType === 'EU' ? size : usToEu(size));
+        }, 0) / perfectFits.length;
+        
         setRecommendation({
-          size: avgSize.toFixed(1),
+          euSize: avgSize.toFixed(1),
+          usSize: euToUs(avgSize).toFixed(1),
           confidence: 0.7,
         });
         return;
@@ -119,7 +142,8 @@ export const RecommendationScreen = () => {
     }
 
     setRecommendation({
-      size: 'Unknown',
+      euSize: 'Unknown',
+      usSize: 'Unknown',
       confidence: 0,
     });
   };
@@ -148,7 +172,7 @@ export const RecommendationScreen = () => {
             brand: shoeToAdd.brand,
             model: shoeToAdd.model,
             size: selectedSize,
-            size_type: sizeType,
+            sizeType: sizeType,
             fit,
           },
         ]);
@@ -231,7 +255,16 @@ export const RecommendationScreen = () => {
           {recommendation && (
             <View style={styles.resultContainer}>
               <Text style={styles.resultTitle}>Recommended Size</Text>
-              <Text style={styles.resultSize}>{recommendation.size}</Text>
+              <View style={styles.sizeDisplayContainer}>
+                <View style={styles.sizeDisplay}>
+                  <Text style={styles.sizeLabel}>EU</Text>
+                  <Text style={styles.resultSize}>{recommendation.euSize}</Text>
+                </View>
+                <View style={styles.sizeDisplay}>
+                  <Text style={styles.sizeLabel}>US</Text>
+                  <Text style={styles.resultSize}>{recommendation.usSize}</Text>
+                </View>
+              </View>
               <Text style={styles.confidenceText}>
                 Confidence: {Math.round(recommendation.confidence * 100)}%
               </Text>
@@ -554,5 +587,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#34C759',
     padding: 15,
     borderRadius: 5,
+  },
+  sizeDisplayContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginBottom: 10,
+  },
+  sizeDisplay: {
+    alignItems: 'center',
+  },
+  sizeLabel: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 5,
   },
 }); 
