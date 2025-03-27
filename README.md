@@ -17,3 +17,7 @@ A React Native app that helps users find their correct shoe size based on their 
 - TypeScript for type safety
 - React Navigation for routing
 - Context API for state management
+
+## To Run
+
+`npx expo start`
