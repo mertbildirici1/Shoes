@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, Modal } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -27,6 +27,10 @@ export const RecommendationScreen = () => {
   const [selectedShoe, setSelectedShoe] = useState<ShoeCatalog | null>(null);
   const [userShoes, setUserShoes] = useState<Shoe[]>([]);
   const [recommendation, setRecommendation] = useState<{ size: string; confidence: number } | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [size, setSize] = useState('');
+  const [fit, setFit] = useState<'too small' | 'perfect' | 'too large'>('perfect');
+  const [shoeToAdd, setShoeToAdd] = useState<ShoeCatalog | null>(null);
   const { user } = useAuth();
   const navigation = useNavigation();
 
@@ -56,30 +60,12 @@ export const RecommendationScreen = () => {
 
     try {
       const { data, error } = await supabase
-        .from('user_shoes')
-        .select(`
-          shoe_id,
-          shoes (
-            id,
-            brand,
-            model,
-            size,
-            fit
-          )
-        `)
+        .from('shoes')
+        .select('*')
         .eq('user_id', user.id);
 
       if (error) throw error;
-      
-      const transformedData = data.map(item => ({
-        id: item.shoes.id,
-        brand: item.shoes.brand,
-        model: item.shoes.model,
-        size: item.shoes.size,
-        fit: item.shoes.fit,
-      }));
-      
-      setUserShoes(transformedData);
+      setUserShoes(data || []);
     } catch (error) {
       Alert.alert('Error', (error as PostgrestError).message);
     }
@@ -131,6 +117,47 @@ export const RecommendationScreen = () => {
     });
   };
 
+  const handleAddToCollection = (shoe: ShoeCatalog) => {
+    if (!user) {
+      Alert.alert('Error', 'Please log in to add shoes to your collection');
+      return;
+    }
+    setShoeToAdd(shoe);
+    setShowAddModal(true);
+  };
+
+  const handleConfirmAdd = async () => {
+    if (!user || !shoeToAdd || !size) {
+      Alert.alert('Error', 'Please enter a size');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('shoes')
+        .insert([
+          {
+            user_id: user.id,
+            brand: shoeToAdd.brand,
+            model: shoeToAdd.model,
+            size,
+            fit,
+          },
+        ]);
+
+      if (error) throw error;
+
+      Alert.alert('Success', 'Shoe added to your collection!');
+      setShowAddModal(false);
+      setSize('');
+      setFit('perfect');
+      setShoeToAdd(null);
+      fetchUserShoes();
+    } catch (error) {
+      Alert.alert('Error', (error as PostgrestError).message);
+    }
+  };
+
   const filteredShoes = shoeCatalog.filter(shoe => 
     shoe.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
     shoe.model.toLowerCase().includes(searchQuery.toLowerCase())
@@ -151,17 +178,27 @@ export const RecommendationScreen = () => {
         data={filteredShoes}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.shoeItem,
-              selectedShoe?.id === item.id && styles.selectedShoe
-            ]}
-            onPress={() => setSelectedShoe(item)}
-          >
-            <Text style={styles.shoeBrand}>{item.brand}</Text>
-            <Text style={styles.shoeModel}>{item.model}</Text>
-            <Text style={styles.shoeCategory}>{item.category}</Text>
-          </TouchableOpacity>
+          <View style={styles.shoeItemContainer}>
+            <TouchableOpacity
+              style={[
+                styles.shoeItem,
+                selectedShoe?.id === item.id && styles.selectedShoe
+              ]}
+              onPress={() => setSelectedShoe(item)}
+            >
+              <View style={styles.shoeInfo}>
+                <Text style={styles.shoeBrand}>{item.brand}</Text>
+                <Text style={styles.shoeModel}>{item.model}</Text>
+                <Text style={styles.shoeCategory}>{item.category}</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => handleAddToCollection(item)}
+            >
+              <Text style={styles.addButtonText}>I have this</Text>
+            </TouchableOpacity>
+          </View>
         )}
       />
 
@@ -196,6 +233,67 @@ export const RecommendationScreen = () => {
           )}
         </View>
       )}
+
+      <Modal
+        visible={showAddModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAddModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Shoe to Collection</Text>
+              <TouchableOpacity 
+                onPress={() => setShowAddModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close-circle" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            {shoeToAdd && (
+              <View style={styles.selectedShoeInfo}>
+                <Text style={styles.selectedShoeBrand}>{shoeToAdd.brand}</Text>
+                <Text style={styles.selectedShoeModel}>{shoeToAdd.model}</Text>
+              </View>
+            )}
+
+            <TextInput
+              style={styles.input}
+              placeholder="Size"
+              value={size}
+              onChangeText={setSize}
+              keyboardType="numeric"
+            />
+
+            <View style={styles.fitContainer}>
+              <TouchableOpacity
+                style={[styles.fitButton, fit === 'too small' && styles.selectedFit]}
+                onPress={() => setFit('too small')}
+              >
+                <Text style={styles.fitButtonText}>Too Small</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.fitButton, fit === 'perfect' && styles.selectedFit]}
+                onPress={() => setFit('perfect')}
+              >
+                <Text style={styles.fitButtonText}>Perfect</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.fitButton, fit === 'too large' && styles.selectedFit]}
+                onPress={() => setFit('too large')}
+              >
+                <Text style={styles.fitButtonText}>Too Large</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmAdd}>
+              <Text style={styles.buttonText}>Add to Collection</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -220,11 +318,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
   },
+  shoeItemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   shoeItem: {
+    flex: 1,
     backgroundColor: 'white',
     padding: 15,
     borderRadius: 5,
-    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  shoeInfo: {
+    flex: 1,
   },
   selectedShoe: {
     backgroundColor: '#e3f2fd',
@@ -299,5 +407,86 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     padding: 5,
+  },
+  addButton: {
+    backgroundColor: '#34C759',
+    padding: 10,
+    borderRadius: 5,
+    marginLeft: 10,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  addButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    minHeight: '50%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  selectedShoeInfo: {
+    backgroundColor: '#f8f9fa',
+    padding: 15,
+    borderRadius: 5,
+    marginBottom: 20,
+  },
+  selectedShoeBrand: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  selectedShoeModel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  input: {
+    backgroundColor: '#f5f5f5',
+    padding: 15,
+    borderRadius: 5,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  fitContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  fitButton: {
+    flex: 1,
+    padding: 10,
+    marginHorizontal: 5,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 5,
+  },
+  selectedFit: {
+    backgroundColor: '#007AFF',
+  },
+  fitButtonText: {
+    textAlign: 'center',
+    color: '#333',
+  },
+  confirmButton: {
+    backgroundColor: '#34C759',
+    padding: 15,
+    borderRadius: 5,
   },
 }); 
