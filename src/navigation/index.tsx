@@ -8,6 +8,7 @@ import { RecommendationScreen } from '../screens/RecommendationScreen';
 import { AddShoeScreen } from '../screens/AddShoeScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { Ionicons } from '@expo/vector-icons';
+import { AdminScreen } from '../screens/AdminScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -77,6 +78,7 @@ export const Navigation = () => {
                 presentation: 'modal',
               }}
             />
+            <Stack.Screen name="Admin" component={AdminScreen} />
           </>
         )}
       </Stack.Navigator>

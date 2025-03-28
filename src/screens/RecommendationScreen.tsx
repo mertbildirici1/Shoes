@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, Modal, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,6 +11,7 @@ interface ShoeCatalog {
   brand: string;
   model: string;
   category: string;
+  image_url: string | null;
 }
 
 interface Shoe {
@@ -172,7 +173,7 @@ export const RecommendationScreen = () => {
             brand: shoeToAdd.brand,
             model: shoeToAdd.model,
             size: selectedSize,
-            sizeType: sizeType,
+            size_type: sizeType,
             fit,
           },
         ]);
@@ -218,9 +219,25 @@ export const RecommendationScreen = () => {
             onPress={() => setSelectedShoe(item)}
           >
             <View style={styles.shoeInfo}>
-              <Text style={styles.shoeBrand}>{item.brand}</Text>
-              <Text style={styles.shoeModel}>{item.model}</Text>
-              <Text style={styles.shoeCategory}>{item.category}</Text>
+              <View style={styles.shoeHeader}>
+                {item.image_url ? (
+                  <Image
+                    source={{ uri: item.image_url }}
+                    style={styles.shoeImage}
+                    resizeMode="cover"
+                    onError={(error) => console.log('Image load error:', error.nativeEvent.error)}
+                  />
+                ) : (
+                  <View style={[styles.shoeImage, styles.placeholderImage]}>
+                    <Text style={styles.placeholderText}>No Image</Text>
+                  </View>
+                )}
+                <View style={styles.shoeTextContainer}>
+                  <Text style={styles.shoeBrand}>{item.brand}</Text>
+                  <Text style={styles.shoeModel}>{item.model}</Text>
+                  <Text style={styles.shoeCategory}>{item.category}</Text>
+                </View>
+              </View>
               <TouchableOpacity
                 style={styles.addButton}
                 onPress={() => handleAddToCollection(item)}
@@ -399,6 +416,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#e3f2fd',
     borderColor: '#007AFF',
     borderWidth: 1,
+  },
+  shoeHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  shoeImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  shoeTextContainer: {
+    flex: 1,
   },
   shoeBrand: {
     fontSize: 16,
@@ -601,5 +632,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginBottom: 5,
+  },
+  placeholderImage: {
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    color: '#999',
+    fontSize: 12,
   },
 }); 

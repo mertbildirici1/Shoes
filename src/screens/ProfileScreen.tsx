@@ -65,9 +65,6 @@ export const ProfileScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Profile</Text>
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </TouchableOpacity>
       </View>
 
       <Text style={styles.email}>{user?.email}</Text>
@@ -76,34 +73,48 @@ export const ProfileScreen = () => {
         style={styles.addButton}
         onPress={() => navigation.navigate('AddShoe')}
       >
-        <Text style={styles.buttonText}>Add New Shoe</Text>
+        <Text style={styles.buttonText}>Add New Shoe to Collection</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={styles.adminButton}
+        onPress={() => navigation.navigate('Admin')}
+      >
+        <Text style={styles.adminButtonText}>Add New Shoe to Catalog</Text>
       </TouchableOpacity>
 
       <Text style={styles.sectionTitle}>My Shoe Collection</Text>
-      <FlatList
-        data={userShoes}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.shoeItem}>
-            <View style={styles.shoeInfo}>
-              <Text style={styles.shoeBrand}>{item.brand}</Text>
-              <Text style={styles.shoeModel}>{item.model}</Text>
-              <Text style={styles.shoeDetails}>Size: {item.size}</Text>
-              <Text style={styles.shoeDetails}>Size Type: {item.size_type}</Text>
-              <Text style={styles.shoeDetails}>Fit: {item.fit}</Text>
+      
+      <View style={styles.listContainer}>
+        <FlatList
+          data={userShoes}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.shoeItem}>
+              <View style={styles.shoeInfo}>
+                <Text style={styles.shoeBrand}>{item.brand}</Text>
+                <Text style={styles.shoeModel}>{item.model}</Text>
+                <Text style={styles.shoeDetails}>Size: {item.size}</Text>
+                <Text style={styles.shoeDetails}>Size Type: {item.size_type}</Text>
+                <Text style={styles.shoeDetails}>Fit: {item.fit}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={() => handleDeleteShoe(item.id)}
+              >
+                <Text style={styles.deleteButtonText}>Delete</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => handleDeleteShoe(item.id)}
-            >
-              <Text style={styles.deleteButtonText}>Delete</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>No shoes in your collection yet</Text>
-        }
-      />
+          )}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>No shoes in your collection yet</Text>
+          }
+        />
+      </View>
+
+      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+        <Text style={styles.signOutText}>Sign Out</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -115,22 +126,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 20,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-  },
-  signOutButton: {
-    backgroundColor: '#FF3B30',
-    padding: 10,
-    borderRadius: 5,
-  },
-  signOutText: {
-    color: 'white',
     fontWeight: 'bold',
   },
   email: {
@@ -148,6 +147,10 @@ const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
     fontWeight: 'bold',
+  },
+  listContainer: {
+    flex: 1,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
@@ -192,5 +195,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#666',
     marginTop: 20,
+  },
+  adminButton: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 5,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  adminButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  signOutButton: {
+    backgroundColor: '#FF3B30',
+    padding: 15,
+    borderRadius: 5,
+    marginTop: 'auto',
+  },
+  signOutText: {
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: 'bold',
   },
 }); 
