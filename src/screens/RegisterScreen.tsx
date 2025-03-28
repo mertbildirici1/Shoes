@@ -3,30 +3,64 @@ import { View, TextInput, TouchableOpacity, Text, StyleSheet, Alert } from 'reac
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { PostgrestError } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 
-export const LoginScreen = () => {
+export const RegisterScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { signIn } = useAuth();
+  const [fullName, setFullName] = useState('');
+  const { signUp } = useAuth();
   const navigation = useNavigation<any>();
 
-  const handleSignIn = async () => {
+  const handleSignUp = async () => {
+    if (!fullName.trim()) {
+      Alert.alert('Error', 'Please enter your name');
+      return;
+    }
+
     try {
-      await signIn(email, password);
-    } catch (error) {
-      const errorMessage = (error as PostgrestError).message;
-      if (errorMessage.includes('Invalid login credentials')) {
-        Alert.alert('Error', 'Incorrect email or password. Please try again.');
-      } else {
-        Alert.alert('Error', errorMessage);
+      const { data: authData, error: signUpError } = await signUp(email, password);
+      
+      if (signUpError) throw signUpError;
+
+      // If signup successful, store the user's name
+      if (authData?.user) {
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert([{
+            id: authData.user.id,
+            full_name: fullName.trim()
+          }]);
+
+        if (profileError) throw profileError;
       }
+
+      Alert.alert(
+        'Success',
+        'Check your email for the confirmation link!',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('Login'),
+          },
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Error', (error as PostgrestError).message);
     }
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.formContainer}>
-        <Text style={styles.title}>Sign In</Text>
+        <Text style={styles.title}>Register</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Full Name"
+          value={fullName}
+          onChangeText={setFullName}
+          autoCapitalize="words"
+        />
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -42,15 +76,15 @@ export const LoginScreen = () => {
           onChangeText={setPassword}
           secureTextEntry
         />
-        <TouchableOpacity style={styles.button} onPress={handleSignIn}>
-          <Text style={styles.buttonText}>Sign In</Text>
+        <TouchableOpacity style={styles.button} onPress={handleSignUp}>
+          <Text style={styles.buttonText}>Register</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.registerContainer}>
-        <Text style={styles.registerText}>Don't have an account? </Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-          <Text style={styles.registerLink}>Register</Text>
+      <View style={styles.loginContainer}>
+        <Text style={styles.loginText}>Already have an account? </Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+          <Text style={styles.loginLink}>Sign In</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -95,17 +129,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-  registerContainer: {
+  loginContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     paddingBottom: 20,
   },
-  registerText: {
+  loginText: {
     fontSize: 16,
     color: '#666',
   },
-  registerLink: {
+  loginLink: {
     fontSize: 16,
     color: '#007AFF',
     fontWeight: 'bold',
